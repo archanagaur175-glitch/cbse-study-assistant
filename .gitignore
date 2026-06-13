@@ -1,0 +1,6 @@
+user_profile.json
+project_3.zip
+__pycache__/
+*.pyc
+.buildozer/
+bin/
