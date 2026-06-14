@@ -1,0 +1,31 @@
+# Flutter
+build/
+.dart_tool/
+.packages
+.pub/
+*.iml
+.idea/
+.metadata
+*.lock
+
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+
+# iOS
+ios/Flutter/Flutter.framework
+ios/Pods/
+
+# macOS
+macos/Pods/
+
+# Linux
+linux/flutter/ephemeral
+
+# Web
+web/favicon.png
+web/icons/
+
+# Windows
+windows/flutter/ephemeral
