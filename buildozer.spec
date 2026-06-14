@@ -34,7 +34,7 @@ requirements = python3,kivy==2.3.1,kivymd==1.2.0,pillow,pygments
 orientation = portrait
 
 # (bool) Indicate if the application should be fullscreen
-fullscreen = 0
+fullscreen = 1
 
 # (list) Application permissions
 android.permissions =

@@ -463,12 +463,19 @@ class CBSEApp(MDApp):
         else:
             sm.current = "onboarding"
 
-        Clock.schedule_once(self._fix_window, 0.1)
+        Clock.schedule_once(self._fix_window, 0.2)
+        Window.bind(size=self._on_window_size)
 
         return sm
 
     def _fix_window(self, dt):
-        Window.size = Window.size
+        Window.size = Window.system_size
+        if self.root:
+            self.root.size = Window.size
+
+    def _on_window_size(self, window, size):
+        if self.root:
+            self.root.size = size
 
     def save_onboarding(self):
         onboarding = self.root.get_screen("onboarding")
