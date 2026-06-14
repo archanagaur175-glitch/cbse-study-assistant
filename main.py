@@ -27,7 +27,10 @@ from recommender import (
 
 
 KV = """
+#:import Window kivy.core.window.Window
+
 <OnboardingScreen>:
+    size: Window.size
     ScrollView:
         MDBoxLayout:
             orientation: "vertical"
@@ -189,6 +192,7 @@ KV = """
                     md_bg_color: 0.678, 0.549, 0.988, 1
 
 <MainScreen>:
+    size: Window.size
     MDBottomNavigation:
         id: bottom_nav
         panel_color: 0.12, 0.12, 0.12, 1
@@ -268,6 +272,7 @@ KV = """
                     spacing: dp(12)
 
 <ChapterDetailScreen>:
+    size: Window.size
     MDBoxLayout:
         orientation: "vertical"
         MDTopAppBar:
