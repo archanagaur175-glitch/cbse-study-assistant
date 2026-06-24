@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'models/profile.dart';
-import 'models/learner_model.dart';
-import 'utils/storage.dart';
-import 'storage/user_progress.dart';
-import 'screens/home_screen.dart';
-import 'screens/onboarding_screen.dart';
+import 'package:provider/provider.dart';
+import 'state/app_state.dart';
+import 'screens/onboarding/onboarding_screen.dart';
+import 'app_shell.dart';
 
-void main() => runApp(const CbseStudyApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const CBSEStudyApp());
+}
 
-class CbseStudyApp extends StatelessWidget {
-  const CbseStudyApp({super.key});
+class CBSEStudyApp extends StatelessWidget {
+  const CBSEStudyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,49 +18,50 @@ class CbseStudyApp extends StatelessWidget {
       title: 'CBSE Study Assistant',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF1A73E8),
+        colorSchemeSeed: const Color(0xFF1565C0),
         useMaterial3: true,
         brightness: Brightness.light,
       ),
-      home: const AppEntry(),
+      home: const _StartupScreen(),
     );
   }
 }
 
-class AppEntry extends StatefulWidget {
-  const AppEntry({super.key});
+class _StartupScreen extends StatefulWidget {
+  const _StartupScreen();
 
   @override
-  State<AppEntry> createState() => _AppEntryState();
+  State<_StartupScreen> createState() => _StartupScreenState();
 }
 
-class _AppEntryState extends State<AppEntry> {
+class _StartupScreenState extends State<_StartupScreen> {
+  Future<AppState?>? _loadFuture;
+
   @override
   void initState() {
     super.initState();
-    _checkProfile();
-  }
-
-  Future<void> _checkProfile() async {
-    final profile = await Storage.loadProfile();
-    if (!mounted) return;
-    if (profile == null) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-      );
-    } else {
-      final learner = await UserProgressStore.loadOrCreate(profile);
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(profile: profile, learner: learner),
-        ),
-      );
-    }
+    _loadFuture = AppState.loadFromDisk();
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return FutureBuilder<AppState?>(
+      future: _loadFuture,
+      builder: (ctx, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final state = snap.data;
+        if (state == null) {
+          return const OnboardingScreen();
+        }
+        return ChangeNotifierProvider.value(
+          value: state,
+          child: const AppShell(),
+        );
+      },
+    );
   }
 }

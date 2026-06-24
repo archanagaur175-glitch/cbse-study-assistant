@@ -25,25 +25,6 @@ class ProgressEntry {
     this.nextReviewDue,
   }) : accuracyHistory = accuracyHistory ?? [];
 
-  void recordAttempt({required bool correct, required double responseTime}) {
-    accuracyHistory.add(correct ? 1.0 : 0.0);
-    if (accuracyHistory.length > 20) {
-      accuracyHistory = accuracyHistory.sublist(accuracyHistory.length - 20);
-    }
-    final total = accuracyHistory.length;
-    final sum = accuracyHistory.fold(0.0, (a, b) => a + b);
-    masteryScore = total > 0 ? sum / total : 0.0;
-
-    if (averageResponseTime == 0.0) {
-      averageResponseTime = responseTime;
-    } else {
-      averageResponseTime = (averageResponseTime * 0.7) + (responseTime * 0.3);
-    }
-    if (!correct) retryCount++;
-    lastReviewed = DateTime.now();
-    difficultyRating = 1.0 - masteryScore;
-  }
-
   int get daysSinceLastReview {
     if (lastReviewed == null) return 999;
     return DateTime.now().difference(lastReviewed!).inDays;

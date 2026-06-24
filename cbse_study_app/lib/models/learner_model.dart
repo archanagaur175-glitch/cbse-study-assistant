@@ -20,38 +20,6 @@ class LearnerModel {
     return progress.putIfAbsent(chapterId, () => ProgressEntry(chapterId: chapterId));
   }
 
-  int get totalChaptersStarted => progress.length;
-  int get totalChaptersCompleted =>
-      progress.values.where((p) => p.masteryScore >= 0.8).length;
-
-  List<ProgressEntry> get dueReviews => progress.values
-      .where((p) =>
-          p.nextReviewDue != null && p.nextReviewDue!.isBefore(DateTime.now()))
-      .toList()
-    ..sort((a, b) => (a.nextReviewDue ?? DateTime.now())
-        .compareTo(b.nextReviewDue ?? DateTime.now()));
-
-  double get overallMastery {
-    if (progress.isEmpty) return 0.0;
-    return progress.values.fold(0.0, (s, p) => s + p.masteryScore) /
-        progress.length;
-  }
-
-  List<ProgressEntry> get weakestTopics {
-    final list = progress.values.toList()
-      ..sort((a, b) => a.masteryScore.compareTo(b.masteryScore));
-    return list.take(5).toList();
-  }
-
-  List<ProgressEntry> get recentlyReviewed {
-    final list = progress.values
-        .where((p) => p.lastReviewed != null)
-        .toList()
-      ..sort((a, b) => (b.lastReviewed ?? DateTime(2000))
-          .compareTo(a.lastReviewed ?? DateTime(2000)));
-    return list.take(5).toList();
-  }
-
   Map<String, dynamic> toJson() => {
         'userId': userId,
         'progress': progress.map((k, v) => MapEntry(k.toString(), v.toJson())),
