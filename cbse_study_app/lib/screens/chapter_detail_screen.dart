@@ -44,7 +44,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   }
 
   void _markStudied({required bool understood}) {
-    final timeSeconds = _tracker.elapsedSeconds.toDouble().clamp(1, 3600);
+    final timeSeconds = _tracker.elapsedSeconds.toDouble().clamp(1.0, 3600.0);
     final quality = SpacedRepetition.qualityFromPerformance(
       correct: understood,
       responseTimeSeconds: timeSeconds,
