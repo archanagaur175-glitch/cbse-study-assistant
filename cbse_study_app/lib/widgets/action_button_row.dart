@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ActionButtonRow extends StatelessWidget {
-  final List<_ActionButtonItem> items;
+  final List<ActionButtonItem> items;
 
   const ActionButtonRow({super.key, required this.items});
 
@@ -41,19 +41,6 @@ class ActionButtonRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ActionButtonItem {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  _ActionButtonItem({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
 }
 
 class ActionButtonItem {

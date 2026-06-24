@@ -1,11 +1,8 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/app_state.dart';
 import '../../data/chapters.dart';
 import '../../models/chapter.dart';
-import '../../models/progress_entry.dart';
-import '../../services/ai_service.dart';
 import '../chapter/chapter_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -34,8 +31,7 @@ class _SearchScreenState extends State<SearchScreen> {
             .where((c) =>
                 c.name.toLowerCase().contains(_query.toLowerCase()) ||
                 c.subject.toLowerCase().contains(_query.toLowerCase()) ||
-                c.keyPoints.any((k) =>
-                    k.toLowerCase().contains(_query.toLowerCase())))
+                c.detailedNotes.toLowerCase().contains(_query.toLowerCase()))
             .toList();
 
     final subjects = {

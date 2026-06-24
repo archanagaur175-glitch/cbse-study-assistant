@@ -127,7 +127,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               }).toList(),
             ),
             const SizedBox(height: 12),
-            const Text('Daily study time: $_dailyMinutes minutes',
+            Text('Daily study time: $_dailyMinutes minutes',
                 style: TextStyle(fontSize: 13)),
             Slider(
               value: _dailyMinutes.toDouble(),

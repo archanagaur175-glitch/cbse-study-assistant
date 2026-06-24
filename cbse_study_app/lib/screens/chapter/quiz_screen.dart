@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/app_state.dart';
@@ -14,7 +13,7 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  List<Map<String, dynamic>> _questions = [];
+  List<AiGeneratedQuestion> _questions = [];
   int _currentIndex = 0;
   int? _selectedIndex;
   bool _showResult = false;
@@ -30,14 +29,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
   void _loadQuestions() {
     final chapter = allChapters.firstWhere((c) => c.id == widget.chapterId);
-    _questions = AIService.generateMCQ(chapter, count: 5);
+    _questions = AIService.generateQuestions(chapter, count: 5);
     if (_questions.isNotEmpty) _questionTimer.start();
   }
 
   void _submitAnswer() {
     if (_selectedIndex == null) return;
     _questionTimer.stop();
-    final correct = _selectedIndex == _questions[_currentIndex]['answer'];
+    final correct = _selectedIndex == _questions[_currentIndex].correctIndex;
     if (correct) _correctCount++;
     final state = context.read<AppState>();
     state.recordQuizAttempt(
@@ -114,8 +113,7 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     final q = _questions[_currentIndex];
-    final options = q['options'] as List<String>;
-    final isCorrect = _showResult && _selectedIndex == q['answer'];
+    final isCorrect = _showResult && _selectedIndex == q.correctIndex;
 
     return Scaffold(
       appBar: AppBar(
@@ -129,17 +127,17 @@ class _QuizScreenState extends State<QuizScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(14),
-                child: Text(q['question'] as String,
+                child: Text(q.question,
                     style: const TextStyle(fontSize: 15)),
               ),
             ),
             const SizedBox(height: 12),
-            ...List.generate(options.length, (i) {
+            ...List.generate(q.options.length, (i) {
               Color? bg;
               if (_showResult) {
-                if (i == q['answer']) {
+                if (i == q.correctIndex) {
                   bg = Colors.green.withOpacity(0.2);
-                } else if (i == _selectedIndex && i != q['answer']) {
+                } else if (i == _selectedIndex && i != q.correctIndex) {
                   bg = Colors.red.withOpacity(0.2);
                 }
               } else if (i == _selectedIndex) {
@@ -162,7 +160,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         children: [
                           Icon(
                             _showResult
-                                ? (i == q['answer']
+                                ? (i == q.correctIndex
                                     ? Icons.check_circle
                                     : i == _selectedIndex
                                         ? Icons.cancel
@@ -172,7 +170,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     : Icons.radio_button_unchecked),
                             size: 20,
                             color: _showResult
-                                ? (i == q['answer']
+                                ? (i == q.correctIndex
                                     ? Colors.green
                                     : i == _selectedIndex
                                         ? Colors.red
@@ -181,7 +179,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                              child: Text(options[i],
+                              child: Text(q.options[i],
                                   style: const TextStyle(fontSize: 14))),
                         ],
                       ),
@@ -190,7 +188,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
               );
             }),
-            if (_showResult && q['explanation'] != null) ...[
+            if (_showResult && q.explanation.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
@@ -210,7 +208,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(q['explanation'] as String,
+                      child: Text(q.explanation,
                           style: const TextStyle(fontSize: 12)),
                     ),
                   ],

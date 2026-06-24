@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/app_state.dart';
@@ -87,11 +86,10 @@ class ChapterDetailScreen extends StatelessWidget {
               ),
             ]),
             const SizedBox(height: 12),
-            _buildSection('Key Points', ch.keyPoints),
-            _buildSection('Important Formulas', ch.formulas),
-            _buildSection('Detailed Notes', ch.detailedNotes),
-            _buildSection('Examples', ch.examples),
-            _buildSection('Practice Problems', ch.practiceProblems),
+            _buildSection('Key Formulas', ch.keyFormulas.split('\n')),
+            _buildSection('Detailed Notes', ch.detailedNotes.split('\n')),
+            _buildSection('Examples', ch.examples.split('\n')),
+            _buildSection('Practice Problems', ch.practiceProblems.split('\n')),
           ],
         ),
       ),
@@ -169,7 +167,7 @@ class ChapterDetailScreen extends StatelessWidget {
   }
 
   void _showSummary(BuildContext context, Chapter ch) {
-    final summary = AIService.generateChapterSummary(ch, maxPoints: 6);
+    final summary = AIService.summarizeChapter(ch);
     showModalBottomSheet(
       context: context,
       builder: (ctx) => Padding(
@@ -184,25 +182,22 @@ class ChapterDetailScreen extends StatelessWidget {
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            if ((summary['key_points'] as List).isNotEmpty) ...[
+            if (summary.keyPoints.isNotEmpty) ...[
               const Text('Key Points',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              ...(summary['key_points'] as List).map(
-                  (p) => Text('• $p', style: const TextStyle(fontSize: 12))),
+              Text(summary.keyPoints, style: const TextStyle(fontSize: 12)),
               const SizedBox(height: 8),
             ],
-            if ((summary['formulas'] as List).isNotEmpty) ...[
+            if (summary.keyFormulas.isNotEmpty) ...[
               const Text('Formulas',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              ...(summary['formulas'] as List)
-                  .map((f) => Text('• $f', style: const TextStyle(fontSize: 12))),
+              Text(summary.keyFormulas, style: const TextStyle(fontSize: 12)),
               const SizedBox(height: 8),
             ],
-            if ((summary['terms'] as List).isNotEmpty) ...[
+            if (summary.keyTerms.isNotEmpty) ...[
               const Text('Key Terms',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              ...(summary['terms'] as List)
-                  .map((t) => Text('• $t', style: const TextStyle(fontSize: 12))),
+              Text(summary.keyTerms, style: const TextStyle(fontSize: 12)),
             ],
             const SizedBox(height: 16),
           ],
@@ -212,7 +207,7 @@ class ChapterDetailScreen extends StatelessWidget {
   }
 
   void _showAiQa(BuildContext context, Chapter ch) {
-    final hint = AIService.getHint(ch, '');
+    final hint = AIService.generateQuickExplanation('key concepts', ch);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -224,7 +219,7 @@ class ChapterDetailScreen extends StatelessWidget {
             const Text('I can help you understand this chapter.',
                 style: TextStyle(fontSize: 13)),
             const SizedBox(height: 8),
-            const Text('Study tips:',
+            const Text('Quick explanation:',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             Text(hint, style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 8),
