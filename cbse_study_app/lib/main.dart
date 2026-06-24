@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'models/profile.dart';
+import 'models/learner_model.dart';
 import 'utils/storage.dart';
+import 'storage/user_progress.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 
@@ -46,8 +48,12 @@ class _AppEntryState extends State<AppEntry> {
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
     } else {
+      final learner = await UserProgressStore.loadOrCreate(profile);
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => HomeScreen(profile: profile)),
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(profile: profile, learner: learner),
+        ),
       );
     }
   }

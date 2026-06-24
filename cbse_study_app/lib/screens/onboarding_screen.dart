@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/profile.dart';
+import '../models/learner_model.dart';
 import '../utils/storage.dart';
+import '../storage/user_progress.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -46,9 +48,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       noteLength: _noteLength,
     );
     await Storage.saveProfile(profile);
+    final learner = await UserProgressStore.loadOrCreate(profile);
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => HomeScreen(profile: profile)),
+      MaterialPageRoute(builder: (_) => HomeScreen(profile: profile, learner: learner)),
     );
   }
 

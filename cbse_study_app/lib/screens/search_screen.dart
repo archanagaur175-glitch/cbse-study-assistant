@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import '../models/chapter.dart';
-import '../utils/recommender.dart';
+import '../models/learner_model.dart';
+import '../services/recommendation_engine.dart';
 import 'chapter_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  final Recommender recommender;
-  const SearchScreen({super.key, required this.recommender});
+  final RecommendationEngine recommender;
+  final LearnerModel learner;
+  final void Function(LearnerModel) onProgressUpdated;
+
+  const SearchScreen({
+    super.key,
+    required this.recommender,
+    required this.learner,
+    required this.onProgressUpdated,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -72,9 +81,14 @@ class _SearchScreenState extends State<SearchScreen> {
                           subtitle: Text('${ch.subject} • ${ch.pages} pages'),
                           trailing: Text('${ch.weightage}%', style: Theme.of(context).textTheme.bodySmall),
                           onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => ChapterDetailScreen(
-                              chapter: ch, recommender: widget.recommender,
-                            )),
+                            MaterialPageRoute(
+                              builder: (_) => ChapterDetailScreen(
+                                chapter: ch,
+                                engine: widget.recommender,
+                                learner: widget.learner,
+                                onProgressUpdated: widget.onProgressUpdated,
+                              ),
+                            ),
                           ),
                         ),
                       );
