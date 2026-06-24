@@ -4,10 +4,12 @@ import '../models/profile.dart';
 import '../models/learner_model.dart';
 import '../data/chapters.dart';
 import '../services/recommendation_engine.dart';
+import '../services/progress_tracker.dart';
 import '../storage/user_progress.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
 import 'chapter_detail_screen.dart';
+import 'quiz_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Profile profile;
@@ -20,22 +22,31 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late RecommendationEngine _engine;
-  late LearnerModel _learner;
+  late ProgressTracker _tracker;
   int _tabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _learner = widget.learner;
+    _tracker = ProgressTracker(
+      learner: widget.learner,
+      onSave: (updated) => UserProgressStore.save(updated),
+    );
     _engine = RecommendationEngine(
       chapters: allChapters,
       profile: widget.profile,
-      learner: _learner,
+      learner: _tracker.learner,
     );
   }
 
+  @override
+  void dispose() {
+    _tracker.dispose();
+    super.dispose();
+  }
+
   Future<void> _saveLearner() async {
-    await UserProgressStore.save(_learner);
+    await UserProgressStore.save(_tracker.learner);
   }
 
   @override
@@ -43,11 +54,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final screens = [
       _buildHomeTab(),
       SearchScreen(
-        recommender: _engine,
-        learner: _learner,
+        engine: _engine,
+        tracker: _tracker,
         onProgressUpdated: _onProgressUpdated,
       ),
-      ProfileScreen(profile: widget.profile, learner: _learner),
+      ProfileScreen(profile: widget.profile, learner: _tracker.learner),
     ];
 
     return Scaffold(
@@ -65,299 +76,353 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTab() {
-    final recommendations = _engine.getTopRecommendations(count: 5);
-    final dueReviews = _learner.dueReviews;
-    final weakTopics = _learner.weakestTopics;
-    final nextChapter = _recommendNext();
-
-    final bySubject = <String, List<Chapter>>{};
-    for (final ch in allChapters) {
-      bySubject.putIfAbsent(ch.subject, () => []).add(ch);
-    }
+    final recommendations = _engine.getTopRecommendations(count: 4);
+    final dueReviews = _tracker.learner.dueReviews;
+    final weakTopics = _tracker.learner.weakestTopics;
 
     return Scaffold(
       appBar: AppBar(title: Text('Hi, ${widget.profile.name}'), centerTitle: true),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
         children: [
-          _buildMasteryCard(),
-          const SizedBox(height: 12),
-          if (nextChapter != null) ...[
-            _buildNextChapterCard(nextChapter),
-            const SizedBox(height: 12),
-          ],
+          _buildMasteryBanner(),
+          const SizedBox(height: 10),
+          if (dueReviews.isNotEmpty) _buildSection('Due for Review', dueReviews.length, Colors.orange, () {}),
           if (dueReviews.isNotEmpty) ...[
-            _buildDueReviewsCard(dueReviews),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            _buildDueCards(dueReviews),
           ],
-          _buildRecommendationsCard(recommendations),
+          const SizedBox(height: 12),
+          _buildSection('Recommended for You', recommendations.length, Colors.blue, _openQuickQuiz),
+          const SizedBox(height: 8),
+          _buildRecommendationCards(recommendations),
           const SizedBox(height: 12),
           if (weakTopics.isNotEmpty) ...[
-            _buildWeakTopicsCard(weakTopics),
+            _buildSection('Needs Attention', weakTopics.length, Colors.red, () {}),
+            const SizedBox(height: 8),
+            _buildWeakCards(weakTopics),
             const SizedBox(height: 12),
           ],
-          _buildStudyPlanCard(),
-          const SizedBox(height: 12),
-          ...bySubject.entries.map((entry) => _buildSubjectCard(entry.key, entry.value)),
+          _buildSection('All Chapters', allChapters.length, Colors.grey, () {}),
+          const SizedBox(height: 8),
+          _buildSubjectGrid(),
         ],
       ),
     );
   }
 
-  Widget _buildMasteryCard() {
-    final overall = _learner.overallMastery;
-    final started = _learner.totalChaptersStarted;
-    final completed = _learner.totalChaptersCompleted;
-    final sessions = _learner.totalStudySessions;
+  Widget _buildMasteryBanner() {
+    final overall = _tracker.learner.overallMastery;
+    final started = _tracker.learner.totalChaptersStarted;
+    final mastered = _tracker.learner.totalChaptersCompleted;
+    final sessions = _tracker.learner.totalStudySessions;
+    final minutes = _tracker.learner.totalMinutesStudied;
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _stat(Icons.auto_stories, '$started', 'Started'),
-                _stat(Icons.check_circle, '$completed', 'Mastered'),
-                _stat(Icons.timer, '${_learner.totalMinutesStudied}m', 'Studied'),
-                _stat(Icons.repeat, '$sessions', 'Sessions'),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Overall Mastery',
+                          style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text('${(overall * 100).round()}%',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: overall >= 0.7
+                                    ? Colors.green
+                                    : overall >= 0.4
+                                        ? Colors.orange
+                                        : Colors.red,
+                              )),
+                          const Spacer(),
+                          _miniStat('$started', 'Started'),
+                          _miniStat('$mastered', 'Mastered'),
+                          _miniStat('$sessions', 'Sessions'),
+                          _miniStat('${minutes}m', 'Time'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                 value: overall,
-                minHeight: 10,
+                minHeight: 8,
+                color: overall >= 0.7
+                    ? Colors.green
+                    : overall >= 0.4
+                        ? Colors.orange
+                        : Colors.red,
                 backgroundColor: Colors.grey.shade200,
               ),
             ),
-            const SizedBox(height: 4),
-            Text('Overall Mastery: ${(overall * 100).round()}%',
-                style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),
     );
   }
 
-  Widget _stat(IconData icon, String value, String label) {
-    return Column(
+  Widget _miniStat(String value, String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 10),
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, int count, Color color, VoidCallback onTap) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(label, style: const TextStyle(fontSize: 11)),
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        Text('$count items', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
       ],
     );
   }
 
-  Chapter? _recommendNext() {
-    final next = _engine.getTopRecommendations(count: 1);
-    return next.isNotEmpty ? next.first : null;
-  }
-
-  Widget _buildNextChapterCard(Chapter chapter) {
-    final reasons = _engine.getReasonsForChapter(chapter);
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: ListTile(
-        leading: const Icon(Icons.auto_awesome),
-        title: const Text('Recommended Next', style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${chapter.name}\n${reasons.take(2).join(' • ')}'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => _openChapter(chapter),
+  Widget _buildDueCards(List<dynamic> entries) {
+    return SizedBox(
+      height: 100,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: entries.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (ctx, i) {
+          final entry = entries[i];
+          final ch = allChapters.cast<Chapter?>().firstWhere(
+              (c) => c!.id == entry.chapterId, orElse: () => null);
+          if (ch == null) return const SizedBox.shrink();
+          return _horizontalCard(
+            ch.name,
+            '${(entry.masteryScore * 100).round()}% • due: +${entry.interval}d',
+            Colors.orange.shade50,
+            Colors.orange.shade700,
+            () => _openChapter(ch),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDueReviewsCard(List<dynamic> entries) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.notifications_active, color: Colors.orange.shade700, size: 20),
-                const SizedBox(width: 8),
-                Text('Due for Review (${entries.length})',
-                    style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...entries.take(3).map((entry) {
-              final ch = allChapters.cast<Chapter?>().firstWhere(
-                  (c) => c!.id == entry.chapterId, orElse: () => null);
-              if (ch == null) return const SizedBox.shrink();
-              return ListTile(
-                dense: true,
-                title: Text(ch.name, style: const TextStyle(fontSize: 13)),
-                subtitle: Text(
-                    'Mastery: ${(entry.masteryScore * 100).round()}%'),
-                trailing: Text('+${entry.interval}d',
-                    style: TextStyle(color: Colors.orange.shade700)),
-                onTap: () => _openChapter(ch),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecommendationsCard(List<Chapter> recommendations) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Recommended for You',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            ...recommendations.map((ch) {
-              final reasons = _engine.getReasonsForChapter(ch);
-              return ListTile(
-                leading: CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    child: Text('${ch.weightage}', style: const TextStyle(fontSize: 11))),
-                title: Text(ch.name, style: const TextStyle(fontSize: 14)),
-                subtitle: Text(
-                    '${ch.subject} • ${ch.pages}p\n${reasons.take(2).join(' • ')}',
-                    style: const TextStyle(fontSize: 11)),
-                trailing: Text('${_engine.calculateRecoveryTime(ch)} min',
-                    style: Theme.of(context).textTheme.bodySmall),
-                onTap: () => _openChapter(ch),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWeakTopicsCard(List<dynamic> entries) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.red.shade600, size: 20),
-                const SizedBox(width: 8),
-                Text('Weakest Topics', style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...entries.map((entry) {
-              final ch = allChapters.cast<Chapter?>().firstWhere(
-                  (c) => c!.id == entry.chapterId, orElse: () => null);
-              if (ch == null) return const SizedBox.shrink();
-              return ListTile(
-                dense: true,
-                title: Text(ch.name, style: const TextStyle(fontSize: 13)),
-                subtitle: Text(
-                    'Accuracy: ${(entry.masteryScore * 100).round()}% • ${entry.retryCount} retries'),
-                trailing: Icon(Icons.chevron_right, size: 18),
-                onTap: () => _openChapter(ch),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStudyPlanCard() {
-    final plan = allChapters
-        .where((c) => _learner.progress.containsKey(c.id) &&
-            _learner.progress[c.id]!.masteryScore < 0.8)
-        .take(3)
-        .toList();
-    if (plan.isEmpty) return const SizedBox.shrink();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.calendar_today, color: Colors.green.shade700, size: 20),
-                const SizedBox(width: 8),
-                Text('Continue Studying',
-                    style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...plan.map((ch) {
-              final entry = _learner.progress[ch.id]!;
-              return ListTile(
-                dense: true,
-                title: Text(ch.name, style: const TextStyle(fontSize: 13)),
-                subtitle: Text(
-                    '${(entry.masteryScore * 100).round()}% complete'),
-                trailing: SizedBox(
-                  width: 60,
-                  child: LinearProgressIndicator(
-                    value: entry.masteryScore,
-                    minHeight: 6,
-                  ),
+  Widget _buildRecommendationCards(List<Chapter> recommendations) {
+    return Column(
+      children: recommendations.map((ch) {
+        final reasons = _engine.getReasonsForChapter(ch);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _openChapter(ch),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: Text('${ch.weightage}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(ch.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                          Text(
+                            '${ch.subject} • ${ch.pages}p • ${reasons.take(2).join(' • ')}',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      children: [
+                        Text('${_engine.calculateRecoveryTime(ch)} min',
+                            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary)),
+                        if (_tracker.learner.progress.containsKey(ch.id))
+                          SizedBox(
+                            width: 30,
+                            child: LinearProgressIndicator(
+                              value: _tracker.learner.progress[ch.id]!.masteryScore,
+                              minHeight: 3,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                onTap: () => _openChapter(ch),
-              );
-            }),
-          ],
-        ),
-      ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildSubjectCard(String subject, List<Chapter> chapters) {
-    final started = chapters.where((c) => _learner.progress.containsKey(c.id)).length;
-    final avgMastery = chapters.fold(0.0, (s, c) {
-      final p = _learner.progress[c.id];
-      return s + (p?.masteryScore ?? 0.0);
-    }) / chapters.length;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(subject, style: Theme.of(context).textTheme.titleMedium),
-                Text('$started/${chapters.length} • ${(avgMastery * 100).round()}%',
-                    style: Theme.of(context).textTheme.bodySmall),
-              ],
+  Widget _buildWeakCards(List<dynamic> entries) {
+    return Column(
+      children: entries.take(3).map((entry) {
+        final ch = allChapters.cast<Chapter?>().firstWhere(
+            (c) => c!.id == entry.chapterId, orElse: () => null);
+        if (ch == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Card(
+            color: Colors.red.shade50,
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.warning_amber_rounded, color: Colors.red.shade600, size: 22),
+              title: Text(ch.name, style: const TextStyle(fontSize: 13)),
+              subtitle: Text(
+                'Accuracy: ${(entry.masteryScore * 100).round()}% • ${entry.retryCount} retries',
+                style: const TextStyle(fontSize: 11),
+              ),
+              trailing: SizedBox(
+                width: 50,
+                child: LinearProgressIndicator(
+                  value: entry.masteryScore,
+                  minHeight: 6,
+                  color: Colors.red,
+                  backgroundColor: Colors.red.shade100,
+                ),
+              ),
+              onTap: () => _openChapter(ch),
             ),
-            const SizedBox(height: 8),
-            ...chapters.map((ch) {
-              final entry = _learner.progress[ch.id];
-              final mastery = entry?.masteryScore ?? 0.0;
-              return ListTile(
-                title: Text(ch.name, style: const TextStyle(fontSize: 14)),
-                subtitle: Text('${ch.pages}p • ${ch.weightage}% weightage'),
-                trailing: entry != null
-                    ? SizedBox(
-                        width: 40,
-                        child: LinearProgressIndicator(value: mastery, minHeight: 4),
-                      )
-                    : const Icon(Icons.chevron_right, size: 18),
-                dense: true,
-                onTap: () => _openChapter(ch),
-              );
-            }),
-          ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSubjectGrid() {
+    final subjects = {'Physics': Icons.science, 'Chemistry': Icons.biotech, 'Mathematics': Icons.calculate, 'Biology': Icons.pets};
+    final chapterCounts = <String, int>{};
+    final masteryBySubject = <String, double>{};
+
+    for (final ch in allChapters) {
+      chapterCounts[ch.subject] = (chapterCounts[ch.subject] ?? 0) + 1;
+      final p = _tracker.learner.progress[ch.id];
+      masteryBySubject[ch.subject] =
+          (masteryBySubject[ch.subject] ?? 0) + (p?.masteryScore ?? 0.0);
+    }
+    for (final s in masteryBySubject.keys) {
+      masteryBySubject[s] = masteryBySubject[s]! / chapterCounts[s]!;
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.8,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: subjects.length,
+      itemBuilder: (ctx, i) {
+        final name = subjects.keys.elementAt(i);
+        final icon = subjects.values.elementAt(i);
+        final count = chapterCounts[name] ?? 0;
+        final mastery = masteryBySubject[name] ?? 0.0;
+        final started = allChapters
+            .where((c) => c.subject == name && _tracker.learner.progress.containsKey(c.id))
+            .length;
+
+        return Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _scrollToSubject(name),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    children: [
+                      Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('$started/$count chapters',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(height: 2),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: mastery,
+                      minHeight: 4,
+                      backgroundColor: Colors.grey.shade200,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _horizontalCard(String title, String subtitle, Color bg, Color fg, VoidCallback onTap) {
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          width: 160,
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: fg), maxLines: 2),
+              const SizedBox(height: 4),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: fg.withOpacity(0.7))),
+            ],
+          ),
         ),
       ),
     );
@@ -370,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) => ChapterDetailScreen(
               chapter: chapter,
               engine: _engine,
-              learner: _learner,
+              tracker: _tracker,
               onProgressUpdated: _onProgressUpdated,
             ),
           ),
@@ -378,13 +443,25 @@ class _HomeScreenState extends State<HomeScreen> {
         .then((_) => _saveLearner());
   }
 
+  void _openQuickQuiz() {
+    final top = _engine.getTopRecommendations(count: 1);
+    if (top.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => QuizScreen(chapter: top.first, tracker: _tracker),
+        ),
+      );
+    }
+  }
+
+  void _scrollToSubject(String subject) {}
+
   void _onProgressUpdated(LearnerModel updated) {
     setState(() {
-      _learner = updated;
       _engine = RecommendationEngine(
         chapters: allChapters,
         profile: widget.profile,
-        learner: _learner,
+        learner: _tracker.learner,
       );
     });
   }
