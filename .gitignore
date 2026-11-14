@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .buildozer/
 bin/
+
+# Local-only working copy; never tracked or pushed.
+/clarity_crew/

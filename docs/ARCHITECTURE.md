@@ -1,10 +1,7 @@
 # Architecture
 
-Static description of the three code bases in this repository. No Python run,
+Static description of the two implementations in this repository. No Python run,
 `flutter pub get` or APK build was performed.
-
-**The canonical implementation is unknown.** This document describes all three and
-does not rank them.
 
 ## Layout
 
@@ -24,13 +21,11 @@ cbse_study_app/          Flutter rewrite
                          spaced_repetition
   lib/state/app_state.dart
 
-clarity_crew/            incomplete Flutter copy (7 files, does not compile)
-
 .github/workflows/       build_apk.yml (Kivy), flutter_build.yml (Flutter)
 build_apk_colab.ipynb    Colab Buildozer notebook
 ```
 
-## App 1: Python/Kivy
+## Implementation 1: Python/Kivy
 
 `main.py` defines `CBSEApp(MDApp)` with `build()`, `on_start()` and a screen
 manager. Screens: `OnboardingScreen`, `MainScreen`, `ChapterDetailScreen`, plus an
@@ -47,7 +42,7 @@ directory and copies `cbse_chapters.csv` from the bundle on first run.
 - `buildozer.spec`: package `studyassistant`, domain `com.cbse`, version 1.0.0,
   portrait, fullscreen, no Android permissions.
 
-## App 2: Flutter (`cbse_study_app`)
+## Implementation 2: Flutter (`cbse_study_app`)
 
 `lib/main.dart` runs `CBSEStudyApp` in a `MaterialApp`. `app_shell.dart` renders an
 `IndexedStack` over three pages (Home, Search, Profile) with a Material 3
@@ -67,16 +62,6 @@ profile, progress and learner model as JSON. Mastery is tracked per chapter with
 0.8 completion threshold plus an overall average.
 
 The same 22 chapters as the CSV are hardcoded in `lib/data/chapters.dart`.
-
-## App 3: `clarity_crew/` (incomplete)
-
-Seven tracked files. `lib/main.dart` runs `ClarityCrewApp` → `AppStateProvider` →
-`MaterialApp` → `AppBootstrap`, and imports `state/app_state.dart`,
-`features/onboarding/...` and `features/home_dashboard/...`, none of which exist in
-the folder. `pubspec.yaml` declares `assets/images/`, which is also untracked.
-
-This folder is a partial copy of the separate ClarityCrew app. It is not part of
-the study assistant and cannot compile as committed.
 
 ## Shared content
 
@@ -117,6 +102,5 @@ backend configuration. `user_profile.json` and `bin/` are git-ignored.
 ## Unknowns
 
 - Whether `buildozer android debug` or `flutter build apk` currently succeed.
-- Which app is intended to ship.
-- Whether `clarity_crew/` was meant to be removed or is a partial migration.
+- Which implementation is the release target.
 - Whether either workflow ever produced an artifact.
